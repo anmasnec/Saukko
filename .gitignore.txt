@@ -8,6 +8,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+#Saukko specific
+**/Saukko/.vs
+*Saukko/Saukko.sln
+
 # User-specific files
 *.rsuser
 *.suo
