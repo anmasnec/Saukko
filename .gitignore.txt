@@ -1,0 +1,2 @@
+**/Saukko/.vs
+/Saukko.sln
