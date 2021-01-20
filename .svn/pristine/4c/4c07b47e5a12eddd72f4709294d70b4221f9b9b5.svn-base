@@ -1,0 +1,596 @@
+﻿using System;
+using System.Collections.Generic;
+using Jypeli;
+using Jypeli.Assets;
+using Jypeli.Controls;
+using Jypeli.Widgets;
+
+// @author Sneck Annika
+// @version 1.11.2019
+
+/// <summary>
+// Saukko-peli
+// Pelissä ohjataan saukkoa, jonka täytyy uida vedessä syömässä kalaa ja näin kerätä pisteitä. Saukon on varottava lähestymästä pallokalaa, joka on myrkyllinen sekä on uitava pakoon
+//haita. Jos syö pallokalan tai hai saa kiinni, peli päättyy. Saukon on myös käytävä aika ajoin maalla haukkaamassa happea ja tästä seurataan ajastinta. 
+//Pelissä on maksimipistemäärä, jota tavoitellaan.
+
+// Tehty: Saukko-hahmon ohjaus nuolinäppäimillä, pelissä kalat ja viholliset liikkuvat, kalat syödään (tuhotaan), hai ja pallokala päättävät pelin,
+//hai alkaa jahtaamaan saukkoa jos saukko ui riittävän lähellä, olioiden kuvat, taustan kuva, raja maan ja veden välille 
+
+// TODO: Hain häipyminen hetkeksi kun tarpeeksi kauan odotetaan maalla,
+//pistelaskurit, maksimipisteet, happiajastin ja saukon
+//kasvu pelin alussa. Lisäksi hain sekä herkkukalojen random-ilmestyminen peliin, ohjeet pelin pelaamiseen, mitä tapahtuu saavuttaessa maksimipisteet, 
+//ulkonäön viimeistely, koodin muokkaus kuten taulukot, silmukat ym..
+// Mahdollisesti sähköankeriaat peliin, jotka randomisti antavat sähköiskun eli päättävät pelin.
+//ignore collision  border ks taso-pelejen 
+
+// Peliin teksti miksi päättyi, esim. saukko söi pallokalan, hai nappasi.. ks esimerkkiä esim hirsipuupelistä. Tee aliohjelma PeliLoppui, jossa console.write
+/// </summary>
+
+public class Saukko : PhysicsGame
+{
+
+    // <summary>
+    /// Aloitetaan peli. Kutsutaan kentälle saukko, kalat sekä viholliset. Saukon aloituspiste on maalla, josta lähdetään nuolinäppäimillä veteen jahtaamaan kaloja.
+    /// </summary>
+
+    // Taustakuva https://pixabay.com/fi/photos/ranska-haute-savoie-aravis-lake-4566669/ 30.10.2019
+    private Image taustaKuva = LoadImage("JarviSuur"); //private eteen mitkä ennen beginiä
+
+   
+
+    // private PhysicsObject LapinakyvaPalkki;
+    public override void Begin()
+    {
+        //MultiSelectWindow alkuValikko = new MultiSelectWindow("Pelin alkuvalikko",
+        //"Aloita uusi peli", "Lopeta");
+        //Mouse.IsCursorVisible = true;
+        //Add(alkuValikko);
+
+        //List<Label> valikonKohdat;
+       // ValikossaLiikkuminen();
+        Valikko();
+        //AloitaPeli();
+        
+        //LuoKentta();
+        //AsetaOhjaimet();
+        //Level.Background.Image = taustaKuva;
+
+        //PhysicsObject saukko = LuoSaukko(this, "saukko");
+        //saukko.Image = LoadImage("SaukkoMuok"); // https://pixabay.com/fi/photos/el%C3%A4in-saukko-nis%C3%A4k%C3%A4s-el%C3%A4intarha-755677/ 30.10.2019
+
+
+        // PhoneBackButton.Listen(ConfirmExit, "Lopeta peli");
+    }
+    void LuoKentta()
+    {
+        Level.Background.Image = taustaKuva;
+        Level.CreateBorders();
+        //LisaaNappaimet();
+        BoundingRectangle alaosa = new BoundingRectangle(new Vector(Level.Left, 0), Level.BoundingRect.BottomRight);
+        BoundingRectangle ylaosa = new BoundingRectangle(Level.BoundingRect.TopLeft, new Vector(Level.Right, 0));
+
+        //AloitaPeli();
+
+        PhysicsObject saukko = LuoSaukko(this, "saukko");
+        saukko.Image = LoadImage("SaukkoMuok"); // https://pixabay.com/fi/photos/el%C3%A4in-saukko-nis%C3%A4k%C3%A4s-el%C3%A4intarha-755677/ 30.10.2019
+
+
+        AddCollisionHandler(saukko, "SyotavaKala", SaukonKalastus);
+        AddCollisionHandler(saukko, "SyotavaHerkkukala", SaukonKalastus);
+        AddCollisionHandler(saukko, "MyrkkyKala", SaukonKalastus);
+        AddCollisionHandler(saukko, "hai", SaukonKalastus);
+
+        //Keyboard.Listen(Key.Left, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa vasemmalle", saukko, new Vector(-150, 0));
+        //Keyboard.Listen(Key.Right, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa oikealle", saukko, new Vector(150, 0));
+        //Keyboard.Listen(Key.Up, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa ylös", saukko, new Vector(0, 150));
+        //Keyboard.Listen(Key.Down, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa alas", saukko, new Vector(0, -150));
+
+        //Keyboard.Listen(Key.Escape, ButtonState.Pressed, PeliPaattyi, "Lopeta peli");
+        //Keyboard.Listen(Key.Enter, ButtonState.Pressed, AloitaAlusta, "Aloita uusi peli");
+
+        PhysicsObject LapinakyvaPalkki = LuoLapinakyvaPalkki(this);
+
+        for (int i = 0; i < 20; i++)
+        {
+            PhysicsObject perusKala = LuoPerusKala(this, alaosa, 100, "SyotavaKala");
+            perusKala.Image = LoadImage("kala"); // https://pixabay.com/fi/photos/thunnus-tonnikala-kalat-69319/ 30.10.2019
+        }
+
+
+        for (int i = 0; i < 6; i++)
+        {
+            PhysicsObject palloKala = LuoPalloKala(this, alaosa, 100, "MyrkkyKala", new Vector());
+            palloKala.Image = Game.LoadImage("PallokalaMuok"); // https://pixabay.com/fi/photos/pufferfish-pallokala-kala-74950/ 30.10.2019
+        }
+
+
+
+        for (int i = 0; i < 3; i++)
+        {
+            PhysicsObject tukki = LuoTukki(this, alaosa, 100, "tukki");
+            tukki.Image = LoadImage("PidempiTukkiMuokattu"); // https://pixabay.com/fi/photos/lokit-kelan-vipu-pitkin-hakkuu-957496/ 30.10.2019
+                                                             // tukki.SetImage
+        }
+
+
+        for (int i = 0; i < 1; i++)
+        {
+            PhysicsObject hai = LuoHai(this, alaosa, 100, "hai", saukko);
+            hai.Image = LoadImage("HaiMuok"); // https://pixabay.com/fi/photos/silkkinen-hain-shark-utelias-meren-541863/ 30.10.2019 
+        }
+
+
+        for (int i = 0; i < 10; i++)
+        {
+            PhysicsObject herkkuKala = LuoHerkkuKala(this, alaosa, 100, "SyotavaHerkkukala");
+            herkkuKala.Image = LoadImage("herkkukala"); // https://pixabay.com/fi/photos/yksitt%C3%A4inen-akvaarioissa-kalat-2377242/ 30.10.2019
+        }
+
+        //LuoHerkkuKala(this, alaosa, 100, "SyotavaKala"); // demo yhdistetään aliohjelmat refactor
+
+        LuoPistelaskuri();
+
+        //MultiSelectWindow alkuValikko = new MultiSelectWindow("Pelin alkuvalikko",
+        //"Aloita uusi peli", "Lopeta");
+        //Add(alkuValikko);
+
+        //List<Label> valikonKohdat;
+        //Valikko();
+
+       // ValikossaLiikkuminen();
+        
+
+
+
+
+        Keyboard.Listen(Key.Left, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa vasemmalle", saukko, new Vector(-150, 0));
+        Keyboard.Listen(Key.Right, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa oikealle", saukko, new Vector(150, 0));
+        Keyboard.Listen(Key.Up, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa ylös", saukko, new Vector(0, 150));
+        Keyboard.Listen(Key.Down, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa alas", saukko, new Vector(0, -150));
+
+        //Keyboard.Listen(Key.Escape, ButtonState.Pressed, Exit, "Lopeta peli");
+        //Keyboard.Listen(Key.Enter, ButtonState.Pressed, AloitaAlusta, "Aloita uusi peli");
+
+
+        //Mouse.ListenOn (Valikko, Label.kohta1, MouseButton.Left, ButtonState.Pressed, AloitaPeli, null);
+        ////Mouse.ListenOn(kohta2, MouseButton.Left, ButtonState.Pressed, ParhaatPisteet, null);
+        //Mouse.ListenOn (kohta3, MouseButton.Left, ButtonState.Pressed, Exit, null);
+        //Mouse.ListenMovement(1.0, ValikossaLiikkuminen, null);
+
+    }
+    //Level.Background.Image = taustaKuva;
+    //Level.CreateBorders();
+    ////LisaaNappaimet();
+    //BoundingRectangle alaosa = new BoundingRectangle(new Vector(Level.Left, 0), Level.BoundingRect.BottomRight);
+    //BoundingRectangle ylaosa = new BoundingRectangle(Level.BoundingRect.TopLeft, new Vector(Level.Right, 0));
+
+    //AloitaPeli();
+
+    //PhysicsObject saukko = LuoSaukko(this, "saukko");
+    //saukko.Image = LoadImage("SaukkoMuok"); // https://pixabay.com/fi/photos/el%C3%A4in-saukko-nis%C3%A4k%C3%A4s-el%C3%A4intarha-755677/ 30.10.2019
+
+
+    //AddCollisionHandler(saukko, "SyotavaKala", SaukonKalastus);
+    //AddCollisionHandler(saukko, "SyotavaHerkkukala", SaukonKalastus);
+    //AddCollisionHandler(saukko, "MyrkkyKala", SaukonKalastus);
+    //AddCollisionHandler(saukko, "hai", SaukonKalastus);
+
+    //Keyboard.Listen(Key.Left, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa vasemmalle", saukko, new Vector(-150, 0));
+    //Keyboard.Listen(Key.Right, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa oikealle", saukko, new Vector(150, 0));
+    //Keyboard.Listen(Key.Up, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa ylös", saukko, new Vector(0, 150));
+    //Keyboard.Listen(Key.Down, ButtonState.Pressed, LiikutaSaukkoa, "Liikuta saukkoa alas", saukko, new Vector(0, -150));
+
+    //Keyboard.Listen(Key.Escape, ButtonState.Pressed, ConfirmExit, "Lopeta peli");
+    //Keyboard.Listen(Key.Enter, ButtonState.Pressed, AloitaPeli, "Aloita uusi peli");
+
+    //PhysicsObject LapinakyvaPalkki = LuoLapinakyvaPalkki(this);
+
+    //for (int i = 0; i < 20; i++)
+    //{
+    //    PhysicsObject perusKala = LuoPerusKala(this, alaosa, 100, "SyotavaKala");
+    //    perusKala.Image = LoadImage("kala"); // https://pixabay.com/fi/photos/thunnus-tonnikala-kalat-69319/ 30.10.2019
+    //}
+
+
+    //for (int i = 0; i < 6; i++)
+    //{
+    //    PhysicsObject palloKala = LuoPalloKala(this, alaosa, 100, "MyrkkyKala", new Vector());
+    //    palloKala.Image = Game.LoadImage("PallokalaMuok"); // https://pixabay.com/fi/photos/pufferfish-pallokala-kala-74950/ 30.10.2019
+    //}
+
+
+
+    //for (int i = 0; i < 3; i++)
+    //{
+    //    PhysicsObject tukki = LuoTukki(this, alaosa, 100, "tukki");
+    //    tukki.Image = LoadImage("PidempiTukkiMuokattu"); // https://pixabay.com/fi/photos/lokit-kelan-vipu-pitkin-hakkuu-957496/ 30.10.2019
+    //                                                     // tukki.SetImage
+    //}
+
+
+    //for (int i = 0; i < 1; i++)
+    //{
+    //    PhysicsObject hai = LuoHai(this, alaosa, 100, "hai", saukko);
+    //    hai.Image = LoadImage("HaiMuok"); // https://pixabay.com/fi/photos/silkkinen-hain-shark-utelias-meren-541863/ 30.10.2019 
+    //}
+
+
+    //for (int i = 0; i < 10; i++)
+    //{
+    //    PhysicsObject herkkuKala = LuoHerkkuKala(this, alaosa, 100, "SyotavaHerkkukala");
+    //    herkkuKala.Image = LoadImage("herkkukala"); // https://pixabay.com/fi/photos/yksitt%C3%A4inen-akvaarioissa-kalat-2377242/ 30.10.2019
+    //}
+
+    ////LuoHerkkuKala(this, alaosa, 100, "SyotavaKala"); // demo yhdistetään aliohjelmat refactor
+
+    //LuoPistelaskuri();
+
+
+
+
+    /// <summary>
+    /// Aliohjelma luo pelaajan eli saukon.
+    /// </summary>
+
+    private static PhysicsObject LuoSaukko(PhysicsGame peli, string tunniste)
+    {
+        PhysicsObject saukko = new PhysicsObject(80, 40, Shape.Rectangle);
+        saukko.Position = new Vector(-200, 320);
+        //saukko.Angle = RandomGen.NextAngle();
+        saukko.Color = Color.Brown;
+        //Vector suunta = RandomGen.NextVector(0, vauhti);
+        saukko.Mass = 10.0;
+        saukko.Velocity = new Vector(0, 0);
+        saukko.CanRotate = false;
+        saukko.CollisionIgnoreGroup = 1;
+        saukko.Tag = tunniste;
+        // saukko.Image = LoadImage("SaukkoMuok"); // https://pixabay.com/fi/photos/el%C3%A4in-saukko-nis%C3%A4k%C3%A4s-el%C3%A4intarha-755677/ 30.10.2019
+        peli.Add(saukko);
+        return saukko;
+    }
+
+
+    /// <summary>
+    /// Aliohjelma liikuttaa saukkoa.
+    /// </summary>
+    /// <param name="saukko">Liikutettava pelaaja</param>
+    /// <param name="suunta">saukon suunta</param>
+    private static void LiikutaSaukkoa(PhysicsObject saukko, Vector suunta)
+    {
+        //Vector suunta = (10, 10);
+        saukko.Move(suunta);
+        //saukko.Velocity = new Vector();
+        saukko.LinearDamping = 0.95;
+        //bool nytVasen = suunta.X < 0;
+        //if (nytVasen ^ vasen) this.MirrorImage();
+        //vasen = nytVasen;
+    }
+
+    private static PhysicsObject LuoLapinakyvaPalkki(PhysicsGame peli)
+    {
+        double leveys = 1000;
+        double korkeus = 30;
+        PhysicsObject LapinakyvaPalkki = new PhysicsObject(leveys, korkeus, Shape.Rectangle);
+        LapinakyvaPalkki.Position = new Vector(0, 280);
+        LapinakyvaPalkki.Color = Color.Transparent;
+        LapinakyvaPalkki.CanRotate = false;
+        LapinakyvaPalkki.Mass = double.PositiveInfinity;
+        LapinakyvaPalkki.CollisionIgnoreGroup = 1;
+        peli.Add(LapinakyvaPalkki);
+        return LapinakyvaPalkki;
+    }
+
+    /// <summary>
+    /// Aliohjelma luo vihollisen eli hain. Hai jahtaa saukkoa, kun saukko on riittävän lähellä haita. Hain saadessa saukon kiinni peli päättyy.
+    /// </summary>
+    private static PhysicsObject LuoHai(PhysicsGame peli, BoundingRectangle rect, double vauhti, string tunniste, PhysicsObject saukko)
+    {
+        double leveys = 140;
+        double korkeus = 80;
+        PhysicsObject hai = new PhysicsObject(leveys, korkeus, Shape.Circle);
+        hai.Position = RandomGen.NextVector(rect);
+        //hai.Angle = RandomGen.NextAngle();
+        hai.Color = Color.DarkGray;
+        //Vector suunta = RandomGen.NextVector(0, vauhti);
+        hai.Velocity = RandomGen.NextVector(5, 15);
+        hai.AngularDamping = 0.95;
+        hai.CanRotate = false;
+        //hai.Hit(suunta);
+        hai.Tag = tunniste;
+        hai.Tag = "hai";
+        //hai.Image = LoadImage("HaiMuok"); // https://pixabay.com/fi/photos/silkkinen-hain-shark-utelias-meren-541863/ 30.10.2019
+        FollowerBrain seuraajanAivot = new FollowerBrain(saukko);
+        hai.Brain = seuraajanAivot;
+        seuraajanAivot.DistanceFar = 250;
+        //hai.Position = BoundingRectangle.alaosa; 
+        // hai.Position = new Vector(200, -320); 
+        peli.Add(hai);
+        return hai;
+    }
+
+
+    /// <summary>
+    /// Aliohjelma luo saukon ravinnon eli kalan. TODO: Lisää pisteet.
+    /// </summary>
+    private static PhysicsObject LuoPerusKala(PhysicsGame peli, BoundingRectangle rect, double vauhti, string tunniste)
+    {
+        double leveys = RandomGen.NextDouble(10, 60);
+        double korkeus = RandomGen.NextDouble(10, 30);
+        PhysicsObject perusKala = new PhysicsObject(leveys, korkeus, Shape.Circle);
+        perusKala.Position = RandomGen.NextVector(rect);
+        //hai.Angle = RandomGen.NextAngle();
+        perusKala.Color = Color.Gray;
+        //Vector suunta = RandomGen.NextVector(0, vauhti);
+        perusKala.Velocity = RandomGen.NextVector(20, 0);
+        perusKala.AngularDamping = 1.0;
+        perusKala.CanRotate = false;
+        //hai.Hit(suunta);
+        perusKala.Tag = tunniste;
+        perusKala.Tag = "SyotavaKala";
+        //perusKala.Image = LoadImage("kala"); // https://pixabay.com/fi/photos/thunnus-tonnikala-kalat-69319/ 30.10.2019 // siirrö kuvat alkuun, ja viittaa täällä niihin
+        peli.Add(perusKala);
+        return perusKala;
+    }
+
+
+    /// <summary>
+    /// Aliohjelma luo saukon erikoisravinnon eli herkkukalan. TODO: Lisää pisteet (enemmän kuin peruskalasta).
+    /// </summary>
+    private static PhysicsObject LuoHerkkuKala(PhysicsGame peli, BoundingRectangle rect, double vauhti, string tunniste)
+    {
+        //double leveys = 60;
+        //double korkeus = 30;
+        PhysicsObject herkkuKala = new PhysicsObject(50, 30, Shape.Circle);
+        herkkuKala.Position = RandomGen.NextVector(rect);
+        //hai.Angle = RandomGen.NextAngle();
+        herkkuKala.Color = Color.Turquoise;
+        //Vector suunta = RandomGen.NextVector(0, vauhti);
+        herkkuKala.Velocity = RandomGen.NextVector(20, 80);
+        herkkuKala.CanRotate = false;
+        herkkuKala.Mass = 10;
+        //hai.Hit(suunta);
+        herkkuKala.Tag = tunniste;
+        herkkuKala.Tag = "SyotavaHerkkukala";
+        // pisteLaskuri.Value += 1;
+        //herkkuKala.Image = LoadImage("herkkukala"); // https://pixabay.com/fi/photos/yksitt%C3%A4inen-akvaarioissa-kalat-2377242/ 30.10.2019
+        peli.Add(herkkuKala);
+        return herkkuKala;
+    }
+
+
+    /// <summary>
+    /// Aliohjelma luo vedessä kelluvia tukkeja jotka hidastavat saukon liikkumista, koska niitä joutuu kiertää. 
+    /// </summary>
+    private static PhysicsObject LuoTukki(PhysicsGame peli, BoundingRectangle rect, double vauhti, string tunniste)
+    {
+        double leveys = RandomGen.NextDouble(60, 160);
+        double korkeus = RandomGen.NextDouble(30, 60);
+        PhysicsObject tukki = new PhysicsObject(leveys, korkeus, Shape.Rectangle);
+        tukki.Position = RandomGen.NextVector(rect);
+        //hai.Angle = RandomGen.NextAngle();
+        tukki.Color = Color.DarkBrown;
+        //Vector suunta = RandomGen.NextVector(0, vauhti);
+        tukki.Velocity = RandomGen.NextVector(10, 0);
+        tukki.CanRotate = false;
+        tukki.Mass = 60.0;
+        //hai.Hit(suunta);
+        tukki.Tag = tunniste;
+        //tukki.Image = LoadImage("PidempiTukkiMuokattu"); // https://pixabay.com/fi/photos/lokit-kelan-vipu-pitkin-hakkuu-957496/ 30.10.2019
+        // tukki.SetImage
+        peli.Add(tukki);
+        return tukki;
+    }
+
+
+    /// <summary>
+    /// Aliohjelma luo vihollisen eli pallokalan. Pallokalan syöminen päättää pelin.
+    /// </summary>
+    private static PhysicsObject LuoPalloKala(PhysicsGame peli, BoundingRectangle rect, double vauhti, string tunniste, Vector kuvanKoko)
+    {
+        //double leveys = 50;
+        //double korkeus = 40;
+        //PhysicsObject palloKala = new Vector(50, 40);
+        PhysicsObject palloKala = new PhysicsObject(40, 30, Shape.Circle);
+        // palloKala.Size = new Vector(40, 20);
+        palloKala.Position = RandomGen.NextVector(rect);
+        //hai.Angle = RandomGen.NextAngle();
+        palloKala.Color = Color.Orange;
+        //Vector suunta = RandomGen.NextVector(0, vauhti);
+        palloKala.Velocity = RandomGen.NextVector(10, 50);
+        palloKala.CanRotate = false;
+        //hai.Hit(suunta);
+        palloKala.Tag = tunniste;
+        palloKala.Tag = "MyrkkyKala";
+        //palloKala.Image = Game.LoadImage("PallokalaMuok"); // https://pixabay.com/fi/photos/pufferfish-pallokala-kala-74950/ 30.10.2019
+        //Image(double 50, double 30);
+        Vector ImageSize = new Vector(100, 100);
+        peli.Add(palloKala);
+        return palloKala;
+    }
+
+    // TODO: Luo mahdoliisesti ankeriasfunktio
+
+
+    /// <summary>
+    /// Aliohjelma kertoo mitä tapahtuu kalan syönnissä. Jos syödään syötävä kala (peruskala tai enemmän pisteitä tuova herkkukala), kala häviää.
+    /// Jos saukko syö myrkyllisen pallokalan, peli päättyy.
+    /// </summary>
+    void SaukonKalastus(PhysicsObject saukko, PhysicsObject kohde)
+    {
+        if (kohde.Tag.ToString() == "SyotavaKala")
+        {
+            kohde.Destroy();
+            pisteLaskuri.Value += 100;
+
+            //TODO: Generoi syödyistä kaloista uusia kaloja kentälle.
+
+        }
+
+        if (kohde.Tag.ToString() == "SyotavaHerkkukala")
+        {
+            kohde.Destroy();
+            pisteLaskuri.Value += 500;
+        }
+
+        if (kohde.Tag.ToString() == "MyrkkyKala") //|| kohde.Tag.ToString() == "hai")
+        {
+            //MessageDisplay.Add("Saukko söi pallokalan! Aloita uusi peli: Enter tai Lopeta: Esc");
+            //Exit(); //TODO: Tee aliohjelma PeliLoppui
+            Valikko();
+
+
+        }
+
+        if (kohde.Tag.ToString() == "hai")
+        {
+            MessageDisplay.Add("Hai nappasi saukon! Aloita uusi peli: Enter tai Lopeta: Esc");
+            //Exit(); //TODO: Tee aliohjelma PeliLoppui
+            Valikko();
+        }
+
+
+    }
+
+    IntMeter pisteLaskuri;
+    void LuoPistelaskuri()
+    {
+        pisteLaskuri = new IntMeter(0);
+
+        Label pisteNaytto = new Label();
+        pisteNaytto.X = Screen.Right - 80;
+        pisteNaytto.Y = Screen.Top - 30;
+        pisteNaytto.TextColor = Color.DarkBlue;
+        pisteNaytto.Color = Color.LightGray;
+        pisteNaytto.Title = "Pisteet";
+        pisteLaskuri.MaxValue = 1000;
+        pisteLaskuri.UpperLimit += KaikkiKeratty;
+
+        pisteNaytto.BindTo(pisteLaskuri);
+        Add(pisteNaytto);
+    }
+
+    void KaikkiKeratty()
+    {
+        MessageDisplay.Add("Saukko voitti pelin."); // TODO: lisää kruunupäisen saukon kuva ja teksti olet järven paras kalastajasaukko
+    }
+
+    //void PeliPaattyi()
+    //{
+
+    //    Keyboard.Listen(Key.Enter, ButtonState.Pressed, AloitaPeli);
+    //    Keyboard.Listen(Key.Escape, ButtonState.Pressed, ConfirmExit);
+    //}
+
+    //void PeliPaattyi(PhysicsObject saukko, PhysicsObject kohde)
+    //{
+    //    //if (kohde.Tag.ToString() == "MyrkkyKala")
+    //    //{
+    //    //    MessageDisplay.Add("Saukko söi pallokalan! Aloita uusi peli: Enter tai Lopeta: Esc");
+    //    //}
+
+    //    //if (kohde.Tag.ToString() == "hai")
+    //    //{
+    //    //    MessageDisplay.Add("Hai nappasi saukon! Aloita uusi peli: Enter tai Lopeta: Esc");
+    //    //}
+
+
+    //    if (Keyboard.Listen(Key.Enter, ButtonState.Pressed))
+    //    {
+    //        AloitaAlusta();
+    //    }
+
+    //   if (Keyboard.Listen(Key.Escape, ButtonState.Pressed))
+    //    {
+    //        Exit();
+    //    }
+
+
+    void AloitaPeli()
+    {
+        //MessageDisplay.Add("Saukko söi pallokalan! Peli alkaa alusta");
+
+
+        ClearAll();
+        LuoKentta();
+
+    }
+
+
+
+
+
+    //AsetaOhjaimet();
+
+
+    void Valikko()
+    {
+        ClearAll(); // Tyhjennetään kenttä kaikista peliolioista
+
+        // Alustetaan lista, johon valikon kohdat tulevat
+        List<Label> valikonKohdat = new List<Label>();
+
+        Label kohta1 = new Label("Aloita uusi peli");  // Luodaan uusi Label-olio, joka toimii uuden pelin aloituskohtana
+        kohta1.Position = new Vector(0, 40);  // Asetetaan valikon ensimmäinen kohta hieman kentän keskikohdan yläpuolelle
+        valikonKohdat.Add(kohta1);  // Lisätään luotu valikon kohta listaan jossa kohtia säilytetään
+
+        //Label kohta2 = new Label("Parhaat pisteet");
+        //kohta2.Position = new Vector(0, 0);
+        //valikonKohdat.Add(kohta2);
+
+        Label kohta3 = new Label("Lopeta peli");
+        kohta3.Position = new Vector(0, -40);
+        valikonKohdat.Add(kohta3);
+
+        // Lisätään kaikki luodut kohdat peliin foreach-silmukalla
+        foreach (Label valikonKohta in valikonKohdat)
+        {
+            Add(valikonKohta);
+        }
+
+        Mouse.ListenOn(kohta1, MouseButton.Left, ButtonState.Pressed, AloitaPeli, null);
+        //Mouse.ListenOn(kohta2, MouseButton.Left, ButtonState.Pressed, ParhaatPisteet, null);
+        Mouse.ListenOn(kohta3, MouseButton.Left, ButtonState.Pressed, Exit, null);
+
+    }
+
+        //void ValikossaLiikkuminen(Mouse.MouseAnalogState hiirentila, List<Label> valikonKohdat)
+        //{
+        //    foreach (Label kohta in valikonKohdat)
+        //    {
+        //        if (Mouse.IsCursorOn(kohta))
+        //        {
+        //            kohta.TextColor = Color.Red;
+        //        }
+        //        else
+        //        {
+        //            kohta.TextColor = Color.Black;
+        //        }
+
+        //    }
+        //}
+    }
+
+        //Mouse.ListenOn(kohta1, MouseButton.Left, ButtonState.Pressed, AloitaPeli, null);
+        ////Mouse.ListenOn(kohta2, MouseButton.Left, ButtonState.Pressed, ParhaatPisteet, null);
+        //Mouse.ListenOn(kohta3, MouseButton.Left, ButtonState.Pressed, Exit, null);
+
+        //void ValikossaLiikkuminen(AnalogState hiirenTila)
+        //{
+        //    foreach (Label kohta in valikonKohdat)
+        //    {
+        //        if (Mouse.IsCursorOn(kohta))
+        //        {
+        //            kohta.TextColor = Color.Red;
+        //        }
+        //        else
+        //        {
+        //            kohta.TextColor = Color.Black;
+        //        }
+
+        //    }
+        //}
+    
+
+
+
