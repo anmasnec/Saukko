@@ -17,4 +17,4 @@ Pelissä on ajastin, jota on seurattava. Saukon on pistäydyttävä ylhäällä 
 
 Pelin edetessä vedessä alkaa kellua liikkeessä tai paikallaan tukkeja, joita on kierrettävä, mutta osuminen ei haittaa. Tukkien kiertely hidastaa paluuta ylös. Myöhemmin vedessä on varottava aika ajoin ruutuun uivia haita, jotka huomattuaan saukon alkavat jahtaamaan sitä. Saukon on paettava ylös maalle piiloon haita. Hai jää vähäksi aikaa etsimään saukkoa, jolloin saukko joutuu odottamaan maalla. Kun hai on poistunut näkyvistä, veteen voi palata ja myös ajastin alkaa alusta. Jos hai nappaa saukon, peli päättyy. Kerätyt pisteet nollautuvat, jos peli päättyy.
 
-Pelissä on maksimipistemäärä, jota tavoitellaan. Kun sen saa täyteen, on kunnia olla järven paras kalastajasaukko, jota myös hait pelkäävät! Kuvaan ilmestyy kruunupäinen saukko ja tällöin peli on pelattu loppuun.
+Pelissä on maksimipistemäärä, jota tavoitellaan. Kun sen saa täyteen, on kunnia olla järven paras kalastajasaukko, jota myös hait pelkäävät! Tällöin peli on pelattu loppuun.
